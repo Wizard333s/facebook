@@ -1,0 +1,28 @@
+import firebase_admin
+from django.conf import settings
+from firebase_admin import credentials, auth
+from .models import User 
+
+cred = credentials.Certificate(str(settings.FIREBASE_KEY_PATH))
+default_app = firebase_admin.initialize_app(cred)
+
+def delete_user_by_provider_id(provider_id, delete_request):
+    page = auth.list_users()
+    user_found = False
+    while page:
+        for user in page.users:
+            if user.provider_data[0].uid==provider_id:
+                try:
+                    user_db = User.objects.get(email=user.email)
+                    user_db.is_active = False
+                    delete_request.user = user_db
+                    delete_request.status = "completed"
+                    delete_request.save()
+                    user_db.save()
+                except User.DoesNotExist:
+                    pass
+                auth.delete_user(user.uid)
+                break
+        if user_found:
+            break
+        page = page.get_next_page()
